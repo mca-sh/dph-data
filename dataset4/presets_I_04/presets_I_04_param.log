@@ -1,0 +1,38 @@
+VIDEO PARAMETERS
+> frame rate (s-1): 10
+> trace length (frames): 8397
+> movie dimension (pixels): 256,256
+> pixel dimension (um): 0.53
+> bit rate: 14
+> camera noise model: N- or Gaussian Model
+	parameter mu_ic,dark: 0
+	parameter sigma_d: 0.067
+	parameter eta: 0.95
+	parameter sigma_q: 0
+	parameter K: 57.8
+
+PRESETS
+> input parameters file: /home/mimi/Documents/MyDataFolder/DPH-test/dataset4/presets_I_04.mat
+
+MOLECULES
+> number of traces: 100
+> number of states: 4
+> total intensity (pc): 36, deviation (pc): 0
+> gamma factor: 1, deviation: 0
+> donor bleedthrough coefficient: 0%
+> acceptor bleedthrough coefficient: 0%
+> donor direct excitation coefficient: 0% of total intensity
+> acceptor direct excitation coefficient: 0% of total intensity
+
+EXPERIMENTAL SETUP
+> background type: Uniform
+> fluorescent background intensity in donor channel(pc): 0
+> fluorescent background intensity in acceptor channel (pc): 0
+
+EXPORT OPTIONS
+> export ASCII traces (in image counts): yes
+> export *.sira video: no
+> export *.avi video: no
+> export *.mat traces: no
+> export ASCII dwell-times: no
+> export ASCII coordinates: no
