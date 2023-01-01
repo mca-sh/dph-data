@@ -37,7 +37,8 @@ for D = 1:Dmax
         if sumexp
             schm0 = [false(D),true(D,1)];
         else
-            schm0 = addExitProb2TransSchemes(getTransSchemes(D));
+            schm0 = ~eye(D,D+1);
+%             schm0 = addExitProb2TransSchemes(getTransSchemes(D));
         end
     end
     S = size(schm0,3);
