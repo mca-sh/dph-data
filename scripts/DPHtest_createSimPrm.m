@@ -2,7 +2,8 @@ function DPHtest_createSimPrm(dest,varargin)
 % DPHtest_createSimPrm(dest)
 % DPHtest_createSimPrm(dest,subfolders)
 %
-% Create pre-set parameter files used to simulate data in the DPH article.
+% Create pre-set parameter files used to simulate data in the DPH article 
+% if it doesn't exist.
 %
 % dest: destination directory
 % subfolders: data sub-folders to be processed
@@ -14,7 +15,8 @@ function DPHtest_createSimPrm(dest,varargin)
 N = 100; % number of trajectories
 rate = 10; % frame rate (per second)
 val = [0.2,0.7]; % FRET values of state a and b
-ndtmin = 4; % minimum number of observed dwell times
+% ndtmin = 4; % minimum number of observed dwell times
+ndtmin = Inf; % minimum number of observed dwell times
 Db_max = 4; % max. state degeneracy of state b
 taub1 = 10; % lifetime of state b1 (in data points)
 baseb = 20; % base number used to calculate gaps between b-states' lifetimes (taub(d)=taub(1)*baseb^(d-1))
@@ -39,16 +41,18 @@ else
 end
 
 % dataset 1 (Da=1, Db=1 to 4, wba=1)
-fldr = fldr0{1};
-L = Inf;
+fldr = 'dataset1';
 Da = 1; % state degeneracies of state a
 Dbs = 1:Db_max; % state degeneracies of state b
 taua = 100; % lifetime of state a (in data points)
 wba = 1; % fraction of transitions b-->a over b-->b
+% L = Inf;
 for Db = Dbs
     taub = taub0(1:Db); % lifetimes of b-states
+    L = 2*sum([taua,taub]);
     W = getWmat(Da,Db,wba);
-    if any(contains(subfolders,fldr))
+    fle = [dest,fldr,filesep,sprintf('presets_I_%i%i_simprm.mat',Da,Db)];
+    if any(contains(subfolders,fldr)) && ~exist(fle,'file')
         createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,...
             [dest,fldr],sprintf('presets_I_%i%i',Da,Db));
     end
@@ -59,10 +63,11 @@ fldr = 'dataset2';
 wba = 0.8; % fraction of transitions b-->a over b-->b
 for Db = Dbs
     taub = taub0(1:Db); % lifetimes of b-states
+    L = 2*sum([taua,taub]);
     W = getWmat(Da,Db,wba);
-    if any(contains(subfolders,fldr))
-        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,...
-            [dest,fldr],sprintf('presets_II_%i%i',Da,Db));
+    fle = [dest,fldr,filesep,sprintf('presets_II_%i%i',Da,Db)];
+    if any(contains(subfolders,fldr)) && ~exist([fle,'_simprm.mat'],'file')
+        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,fle);
     end
 end
 
@@ -70,12 +75,14 @@ end
 fldr = 'dataset3';
 Db = 3; % max. state degeneracy of state b
 taub = taub0(1:Db); % lifetimes of b-states
+L = 2*sum([taua,taub]);
 wbas = 0:0.1:1; % fraction of transitions b-->a over b-->b
 for wba = wbas
     W = getWmat(Da,Db,wba);
-    if any(contains(subfolders,fldr))
-        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,...
-            [dest,fldr],strrep(sprintf('presets_II_%.2f',wba),'.',''));
+    fle = ...
+        [dest,fldr,filesep,strrep(sprintf('presets_II_%.2f',wba),'.','')];
+    if any(contains(subfolders,fldr)) && ~exist([fle,'_simprm.mat'],'file')
+        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,fle);
     end
 end
 
@@ -87,10 +94,11 @@ wba = 1; % fraction of transitions b-->a over b-->b
 W = getWmat(Da,Db,wba);
 for taub2 = taub2s
     taub(2) = taub2;
-    if any(contains(subfolders,fldr))
-        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,...
-            [dest,fldr],...
-            strrep(sprintf('presets_I_%.3f',taub(2)/1000),'.',''));
+    L = 2*sum([taua,taub]);
+    fle = [dest,fldr,filesep,...
+        strrep(sprintf('presets_I_%.3f',taub(2)/1000),'.','')];
+    if any(contains(subfolders,fldr)) && ~exist([fle,'_simprm.mat'],'file')
+        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,fle);
     end
 end
 
@@ -100,10 +108,11 @@ wba = 0.8; % fraction of transitions b-->a over b-->b
 W = getWmat(Da,Db,wba);
 for taub2 = taub2s
     taub(2) = taub2;
-    if any(contains(subfolders,fldr))
-        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,...
-            [dest,fldr],...
-            strrep(sprintf('presets_II_%.3f',taub(2)/1000),'.',''));
+    L = 2*sum([taua,taub]);
+    fle = [dest,fldr,filesep,...
+        strrep(sprintf('presets_II_%.3f',taub(2)/1000),'.','')];
+    if any(contains(subfolders,fldr)) && ~exist([fle,'_simprm.mat'],'file')
+        createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,fle);
     end
 end
 
@@ -117,18 +126,18 @@ waa = 0;
 L = 2*sum([taua,taub]);
 ndtmin = Inf;
 W = [0,waa,1-waa,0; waa,0,0,1-waa; 1,0,0,0; 0,1,0,0];
-if any(contains(subfolders,fldr))
-    createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,[dest,fldr],...
-        'presets_quench');
+fle = [dest,fldr,filesep,'presets_quench'];
+if any(contains(subfolders,fldr)) && ~exist([fle,'_simprm.mat'],'file')
+    createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,fle);
 end
 
 % dataset 7 (Da=2, Db=2, taua=[20,200], taub=[50,500], waa=0.1)
 fldr = 'dataset7';
 waa = 0.1;
 W = [0,waa,1-waa,0; waa,0,0,1-waa; 1,0,0,0; 0,1,0,0];
-if any(contains(subfolders,fldr))
-    createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,[dest,fldr],...
-        'presets_dyn');
+fle = [dest,fldr,filesep,'presets_dyn'];
+if any(contains(subfolders,fldr)) && ~exist([fle,'_simprm.mat'],'file')
+    createPresetsFile(val,N,L,ndtmin,Da,Db,taua,taub,W,rate,fle);
 end
 
 

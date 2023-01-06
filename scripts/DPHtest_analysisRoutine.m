@@ -68,8 +68,7 @@ if cnt.isdir
     end
     
 else
-    
-    % select .mat preset files
+    % select _simprm.mat preset files
     if ~(endsWith(cnt.name,'_simprm.mat'))
         return
     end
@@ -77,19 +76,41 @@ else
     setname = fname(1:end-length('_simprm'));
     subdir = [cnt.folder,filesep,setname];
     
-    % show action
-    disp(['simulate and analyze dataset: ',setname]);
+    % determine whether BW analysis must be performed
+    bwana = any(contains({'presets_quench','presets_dyn'},setname));
     
-    % data simulation and export
-    if any(contains({'presets_quench','presets_dyn'},setname))
-        simtraj = true;
-    else
-        simtraj = false;
+    % data simulation/import and export
+    simdatfles = cell(1,R);
+    str_fles = '';
+    for r = 1:R
+        simdatfles{r} = ...
+            [subdir,filesep,setname,sprintf('_%i_simres.mat',r)];
+        str_fles = cat(2,str_fles,' ',setname,sprintf('_%i_simres.mat',r));
     end
-    [simprm,simres] = ...
-        DPHtest_simdata([cnt.folder,filesep,cnt.name],R,simtraj);
+    if  ~any(cellfun(@isempty,simdatfles)) && ...
+            all(cellfun(@exist,simdatfles))
+        disp(['read simulation parameters from file: ',setname,...
+            '_simprm.mat ...']);
+        simprm = load([cnt.folder,filesep,setname,'_simprm.mat']);
+        
+        disp(['read simulated data from files:',str_fles,' ...']);
+        simres = cell(1,R);
+        for r = 1:R
+            res = load(simdatfles{r});
+            simres{r} = res.res;
+        end
+    else
+        disp(['simulate data for dataset: ',setname,' ...']);
+        if any(contains({'presets_quench','presets_dyn'},setname))
+            simtraj = true;
+        else
+            simtraj = false;
+        end
+        [simprm,simres] = ...
+            DPHtest_simdata([cnt.folder,filesep,cnt.name],R,simtraj);
+    end
     
-    % data analysis and export
+    % data analysis/import and export
     [~,datadir,~] = fileparts(cnt.folder);
     if any(contains({'dataset1','dataset2'},datadir))
         dphprm.Dmax = 5;
@@ -101,27 +122,41 @@ else
             continue
         end
 
-        % ML-DPH analysis of simulated dwell times
-        dphres = ...
-            MLDPH_analysis([subdir,filesep,setname,'_',num2str(r),'_dph'],...
-            simres{r}.dt_obs,simprm,dphprm,false);
-        if isempty(dphres)
-            continue
-        end
+        mldphres_fle = ...
+            [subdir,filesep,setname,'_',num2str(r),'_mldphres.mat'];
         
-        expres = ...
-            MLDPH_analysis([subdir,filesep,setname,'_',num2str(r),'_exp'],...
-            simres{r}.dt_obs,simprm,dphprm,true);
-        if isempty(expres)
-            continue
-        end
+        % import exisiting results
+        if exist(mldphres_fle,'file') && bwana
+            mldphres = load(mldphres_fle);
+            dphres = mldphres.dphres;
+            
+        % ML-DPH analysis
+        elseif ~exist(mldphres_fle,'file')
+            dphres = MLDPH_analysis(...
+                [subdir,filesep,setname,'_',num2str(r),'_dph'],...
+                simres{r}.dt_obs,simprm,dphprm,false);
+            if isempty(dphres)
+                continue
+            end
 
-        % export DPH fit parameters and computation time
-        fname = [setname,'_',num2str(r),'_mldphres.mat'];
-        save([subdir,filesep,fname],'dphres','expres','-mat');
+            expres = MLDPH_analysis(...
+                [subdir,filesep,setname,'_',num2str(r),'_exp'],...
+                simres{r}.dt_obs,simprm,dphprm,true);
+            if isempty(expres)
+                continue
+            end
+
+            % export DPH fit parameters and computation time
+            save(mldphres_fle,'dphres','expres','-mat');
+        end
         
         % BW inference on simulated state sequences
-        if any(contains({'presets_quench','presets_dyn'},setname))
+        if bwana
+            bwres_fle = ...
+                [subdir,filesep,setname,'_',num2str(r),'_bwres.mat'];
+            if exist(bwres_fle,'file')
+                continue
+            end
             
             % using ML-DPH outcome
             bwres_w = BW_analysis(simprm,dphprm,simres{r}.dt_obs,...
@@ -129,17 +164,16 @@ else
             if isempty(bwres_w)
                 continue
             end
-            
+
             % not using ML-DPH outcome
             bwres_wo = BW_analysis(simprm,dphprm,simres{r}.dt_obs,...
                 simres{r}.seq,dphres,T,false);
             if isempty(bwres_wo)
                 continue
             end
-            
+
             % save results to _bwres.mat file
-            fname = [setname,'_',num2str(r),'_bwres.mat'];
-            save([subdir,filesep,fname],'bwres_w','bwres_wo','-mat');
+            save(bwres_fle,'bwres_w','bwres_wo','-mat');
         end
     end
 end

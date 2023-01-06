@@ -128,7 +128,7 @@ end
 if any(contains(subfig,'figure3A'))
     disp('process subfigure 3A...')
     datdir = 'dataset6';
-    hdrs_3A11 = {'D','BIC_a','BIC_b','std(BIC_a)','std(BIC_b)'};
+    hdrs_3A11 = {'D','scheme','BIC_a','BIC_b','std(BIC_a)','std(BIC_b)'};
     hdrs_3A12 = {'STPM_a','std(STPM_a)','STPM_b','std(STPM_b)'};
     hdrs_3A13 = {'t','std(t)'};
     hdrs_3A1 = {'BIC','STPM','t_comp'};
@@ -167,7 +167,7 @@ end
 if any(contains(subfig,'figure3B'))
     disp('process subfigure 3B...')
     datdir = 'dataset7';
-    hdrs_3A11 = {'D','BIC_a','BIC_b','std(BIC_a)','std(BIC_b)'};
+    hdrs_3A11 = {'D','scheme','BIC_a','BIC_b','std(BIC_a)','std(BIC_b)'};
     hdrs_3A12 = {'STPM_a','std(STPM_a)','STPM_b','std(STPM_b)'};
     hdrs_3A13 = {'t','std(t)'};
     hdrs_3A1 = {'BIC','STPM','t_comp'};
@@ -376,7 +376,7 @@ for f = 1:size(simlist)
             STPMs = {mean(STPMs{1},3),std(STPMs{1},[],3),...
                 mean(STPMs{2},3),std(STPMs{2},[],3)};
             BICs_std = std(BICs,[],3);
-            BICs = [mean(BICs,3),BICs_std(:,2:end)];
+            BICs = [mean(BICs,3),BICs_std(:,3:end)];
             dat{1} = {TPMs(:,1),TPMs(:,2:J+1),TPMs(:,J+2),...
                 TPMs(:,(J+3):(2*J+2)),TPMs(:,(2*J+3):(3*J+2)),...
                 TPMs(:,(3*J+3):(4*J+2)),TPMs(:,(4*J+3):(5*J+2)),...
@@ -437,13 +437,19 @@ tcum{2} = zeros(Db,1);
 for n = 1:numel(dt)
     id_a = find(dt{n}(:,2)>=1 & dt{n}(:,2)<=Da);
     if ~isempty(id_a)
-        frsta = dt{n}(id_a([1,find(diff(id_a)>1)+1]),2);
+        frsta = dt{n}(id_a(1),2);
+        if numel(id_a)>1
+            frsta = cat(1,frsta,dt{n}(id_a(find(diff(id_a)>1)+1),2));
+        end
     else
         frsta = [];
     end
     id_b = find(dt{n}(:,2)>=(Da+1) & dt{n}(:,2)<=(Da+Db));
     if ~isempty(id_b)
-        frstb = dt{n}(id_b([1,find(diff(id_b)>1)+1]),2);
+        frstb = dt{n}(id_b(1),2);
+        if numel(id_b)>1
+            frstb = cat(1,frstb,dt{n}(id_b(find(diff(id_b)>1)+1),2));
+        end
     else
         frstb = [];
     end

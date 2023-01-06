@@ -17,7 +17,7 @@ function res = BW_analysis(simprm,dphprm,dt,seq,dphres,T,dphguess)
 % res: {1-by-4} BW results
 
 % get project parameters
-BIC = dphres{2};
+minBIC = dphres{1};
 mdl = dphres{3};
 states = dphres{4};
 
@@ -66,8 +66,7 @@ clstPop = clstPop/sum(sum(clstPop));
 if dphguess
     D = zeros(1,V);
     for v = 1:V
-        [~,ind] = min(BIC(:,v+1));
-        D(v) = BIC(ind,1);
+        D(v) = minBIC(v,2);
     end
     J = sum(D);
     tp0 = zeros(J);

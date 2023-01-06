@@ -22,6 +22,8 @@ function [degen,mdl,BIC,minBIC] = script_findBestModel(dt,Dmax,states,...
 %   mdl.N: [1-by-V] number of data
 %   mdl.schm: transition scheme
 % BIC: {1-by-Dmax}[V-by-S] BIC for all complexities
+% minBIC = [V-by-3] min-BIC (1st column), most sufficient state degeneracy
+%   (2nd) and transition scheme index (3rd)
 
 % initialize computation time
 t_comp = tic;
@@ -50,7 +52,7 @@ for D = 1:Dmax
             schm{v} = schm0(:,:,s);
         end
         mdl{D} = cat(1,mdl{D},...
-            script_inferPH(dt,states,expT,dt_bin,T,D,schm,''));
+            script_inferPH(dt,states,expT,dt_bin,T,repmat(D,1,V),schm,''));
         
         LogL_v = [];
         for v = 1:V
@@ -89,7 +91,7 @@ end
 % show most sufficient state configuration
 id = [];
 for v = 1:V
-    [~,degen(v)] = minBIC(v,2);
+    degen(v) = minBIC(v,2);
     id = cat(2,id,repmat(v,[1,degen(v)]));
 end
 fprintf(['Most sufficient state configuration:\n[%0.2f',...

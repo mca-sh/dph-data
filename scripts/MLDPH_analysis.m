@@ -44,14 +44,20 @@ if isempty(dt)
     return
 end
 
-[D,mdl,cmb,BIC_cmb,BIC] = ...
+[D,mdl,BIC,minBIC] = ...
     script_findBestModel(dt(:,[1,4,2,3]),Dmax,states,expT,dt_bin,T,sumexp,...
     dest);
+
+BICres = [];
+for D0 = 1:numel(BIC)
+    S = size(BIC{D0},2);
+    BICres = cat(1,BICres,[repmat(D0,[S,1]),(1:S)',BIC{D0}']);
+end
 
 degen = [];
 for v = 1:numel(states)
     degen = cat(2,degen,repmat(v,[1,D(v)]));
 end
 states = states(degen);
-res = {[cmb,BIC_cmb'],[1:Dmax;BIC]',mdl,states};
+res = {minBIC,BICres,mdl,states};
 

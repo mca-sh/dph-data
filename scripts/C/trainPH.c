@@ -32,6 +32,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs,
 	// get input dimensions
 	int J = (int) mxGetN(prhs[1]);
 	int nDt = (int) mxGetN(prhs[2]);
+    int nb_int = 0;
 	
 	// get input values
 	const double *a0 = (const double *) mxGetDoubles(prhs[0]); // starting initial state prob.
@@ -42,14 +43,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs,
 	plhs[0] = mxCreateDoubleMatrix(1,J,mxREAL); // PH initial state prob.
 	plhs[1] = mxCreateDoubleMatrix(J,J,mxREAL); // PH transition matrix
 	plhs[2] = mxCreateDoubleScalar(0); // Likelihood of PH given the dwell times
+    plhs[3] = mxCreateDoubleScalar(0); // Number of printed characters
 	double *a = mxGetDoubles(plhs[0]);
 	double *T = mxGetDoubles(plhs[1]);
 	double *logL = mxGetDoubles(plhs[2]);
+    double *nb = mxGetDoubles(plhs[3]);
 
 	// train PH
 	setVect(T,T0,J*J);
 	setVect(a,a0,J);
-	bool cvg = optDPH(T,a,logL,cnts,J,nDt);
+	bool cvg = optDPH(T,a,logL,cnts,J,nDt,&nb_int);
+    *nb = (double) nb_int;
 	
 	// return empty arrays if EM did not converge
 	if (!cvg){
@@ -64,9 +68,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs,
 
 
 bool optDPH(double* T, double* a, double* logL, const double* cnts, int J, 
-        int nDt){
+        int nDt, int* nb){
 	
-	int i = 0, j = 0, nb = 0;
+	int i = 0, j = 0;
 	bool cvg = 0;
 	double m = 0, dmax = 0, logL_prev = 0, totCnt = 0;
 	double t[J], T_prev[J*J], a_prev[J], B[J], Ni[J], Nij[J*J];
@@ -109,7 +113,9 @@ bool optDPH(double* T, double* a, double* logL, const double* cnts, int J,
 	*logL = calcDPHlogL( (const double*) T, (const double*) a, 
             (const double*) t, cnts,J,nDt, (const int**) id_T, 
             (const int**) id_P, (const int**) id_Jv);
-	nb = dispDPHres(m,*logL-logL_prev,dmax, (const double*) T, 
+    if (!mxIsFinite(*logL)){ cvg = true; }
+    
+	*nb = dispDPHres(m,*logL-logL_prev,dmax, (const double*) T, 
             (const double*) a,J, (const int**) id_T,0);
 	
 	// calculate total number of dwell times
@@ -139,6 +145,7 @@ bool optDPH(double* T, double* a, double* logL, const double* cnts, int J,
 		*logL = calcDPHlogL((const double*) T,(const double*) a,
                 (const double*) t,cnts,J,nDt,(const int**) id_T,
                 (const int**) id_P,(const int**) id_Jv);
+        if (!mxIsFinite(*logL)){ break; }
 
 		// check for convergence
 		dmax = calcMaxDev((const double*) T,(const double*) T_prev,
@@ -146,14 +153,22 @@ bool optDPH(double* T, double* a, double* logL, const double* cnts, int J,
 		//if (dmax<DMIN){ cvg = 1; }
 		if ((*logL-logL_prev)<DLMIN){ cvg = 1; }
 		
-		nb = dispDPHres(m,*logL-logL_prev,dmax,(const double*) T,
-                (const double*) a,J,(const int**) id_T,nb);
+		*nb = dispDPHres(m,*logL-logL_prev,dmax,(const double*) T,
+                (const double*) a,J,(const int**) id_T,*nb);
 	}
 	
 	if (!cvg){
-		nb = eraseAndWrite(
-                "maximum number of iterations has been reached\n",nb);
+        if (m>=MAXITER){
+            *nb = eraseAndWrite(
+                    "maximum number of iterations has been reached\n",*nb);
+        }
+        else { 
+            *nb = eraseAndWrite("infinite log-likelihood\n",*nb); 
+        }
 	}
+    else if (m==0){
+        *nb = eraseAndWrite("ill-defined starting guess\n",*nb); 
+    }
 	
 	// free memory outside the while loop for speed
 	for (i=0; i<J; i++){ free(id_T[i]); }
@@ -351,6 +366,8 @@ int eraseAndWrite(char* str, int nb){
 	
 	// write iteration
 	nb = mexPrintf(str);
+    
+    return nb;
 }
 
 
@@ -373,7 +390,7 @@ int dispDPHres(double m,double dL, double dmax, const double* T,
             DLMIN,dmax);
 	
 	// write probabilities
-	nb = nb + mexPrintf("Initial probabilities:\n");
+	/*nb = nb + mexPrintf("Initial probabilities:\n");
 	for (i=0; i<J; i++){
 		nb = nb + mexPrintf("\t%.4f",a[i]);
 	}
@@ -385,7 +402,7 @@ int dispDPHres(double m,double dL, double dmax, const double* T,
 			nb = nb + mexPrintf("\t%.4f",T[id_T[i][j]]);
 		}
 		nb = nb + mexPrintf("\n");
-	}
+	}*/
 	mexEvalString("drawnow;");
 	
 	return nb;
@@ -402,7 +419,7 @@ bool validArg(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
 		mexErrMsgTxt("Three input arguments are required.");
 		return 0;
 	} 
-	if (nlhs>3) {
+	if (nlhs>4) {
 		mexErrMsgTxt("Too many output arguments.");
 		return 0;
 	}
