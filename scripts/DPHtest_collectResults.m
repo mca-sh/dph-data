@@ -34,8 +34,8 @@ end
 if ~isempty(varargin)
     subfig = varargin{1};
 else
-    subfig = {'figure2AB','figure2C','figure2D','figure3A','figure3B',...
-        'figureS1A'};
+    subfig = {'figure2ABC','figure2C','figure2D','figure2E','figure3A',...
+        'figure3B', 'figureS1A'};
 end
 strsubfig = '';
 for sd = 1:numel(subfig)
@@ -43,91 +43,116 @@ for sd = 1:numel(subfig)
 end
 disp(['files will be exported for: ',strsubfig(1:end-1),'.']);
 
-% figure 2AB: D and model fidelity = f(D_GT) for models I and II
-if any(contains(subfig,'figure2AB'))
-    disp('process subfigure 2AB...')
+% figure 2ABC: D and model accuracy = f(D_GT) for models I, II and III
+if any(contains(subfig,'figure2ABC'))
+    disp('process subfigure 2ABC...')
     datdirI = 'dataset1';
     datdirII = 'dataset2';
-    hdrs_2AB = {'GT Db_I','Db_I','std(Db_I)','MF_I','std(MF_I)','GT Db_II',...
-        'Db_II','std(Db_II)','MF_II','std(MF_II)'};
+    datdirIII = 'dataset3';
+    hdrs_2ABC = {'GT Db_I','Db_I','std(Db_I)','acc_I','std(acc_I)',...
+        'GT Db_II','Db_II','std(Db_II)','acc_II','std(acc_II)',...
+        'GT Db_III','Db_III','std(Db_III)','acc_III','std(acc_III)'};
     
     disp('>> collect data for DPH fit model...')
-    dat_2AB = [readData([rootdir,datdirI]),readData([rootdir,datdirII])];
-    dat_2AB = mat2cell(dat_2AB,size(dat_2AB,1),ones(1,size(dat_2AB,2)));
-    exportJson([destdir,'figure2',filesep,'data_figure2AB.json'],...
-        [hdrs_2AB;dat_2AB]);
+    dat_2ABC = [readData([rootdir,datdirI]),readData([rootdir,datdirII]),...
+        readData([rootdir,datdirIII])];
+    dat_2ABC = ...
+        mat2cell(dat_2ABC,size(dat_2ABC,1),ones(1,size(dat_2ABC,2)));
+    exportJson([destdir,'figure2',filesep,'data_figure2ABC.json'],...
+        [hdrs_2ABC;dat_2ABC]);
     
     disp('>> collect data for sum exp. fit model...')
-    dat_2AB = [readData([rootdir,datdirI],'none',true),...
-        readData([rootdir,datdirII],'none',true)];
-    dat_2AB = mat2cell(dat_2AB,size(dat_2AB,1),ones(1,size(dat_2AB,2)));
-    exportJson([destdir,'figure2',filesep,'data_figure2AB_sumexp.json'],...
-        [hdrs_2AB;dat_2AB]);
+    dat_2ABC = [readData([rootdir,datdirI],'none',true),...
+        readData([rootdir,datdirII],'none',true),...
+        readData([rootdir,datdirIII],'none',true)];
+    dat_2ABC = mat2cell(dat_2ABC,size(dat_2ABC,1),ones(1,size(dat_2ABC,2)));
+    exportJson([destdir,'figure2',filesep,'data_figure2ABC_sumexp.json'],...
+        [hdrs_2ABC;dat_2ABC]);
 end
 
-% figure 2C: D and model fidelity = f(Nab/Nbb) for model II and three DPH fit curves
-if any(contains(subfig,'figure2C'))
-    disp('process subfigure 2C...')
-    datdir = 'dataset3';
-    hdrs_2C2 = {'dt','summed count','std count','summed fit','std fit',...
+% figure 2D: D and model accuracy = f(Nab/Nbb) for model II and three DPH fit curves
+if any(contains(subfig,'figure2D'))
+    disp('process subfigure 2D...')
+    datdir = 'dataset4';
+    hdrs_2D2 = {'dt','summed count','std count','summed fit','std fit',...
         'summed mdl','std mdl'};
-    hdrs_2C = {'GT Db_II','Nab/Nbb','Db_II','std(Db_II)','MF_II',...
-        'std(MF_II)','dthist'};
+    hdrs_2D = {'GT Db_II','Nab/Nbb','Db_II','std(Db_II)','acc_II',...
+        'std(acc_II)','dthist'};
     
     disp('>> collect data for DPH fit model...')
     dat = readData([rootdir,datdir],'wba');
-    dat_2C1 = mat2cell(dat{1},size(dat{1},1),ones(1,size(dat{1},2)));
-    dat_2C2 = {};
+    dat_2D1 = mat2cell(dat{1},size(dat{1},1),ones(1,size(dat{1},2)));
+    dat_2D2 = {};
     for n = 1:numel(dat{2})
-        dat_2C2 = cat(1,dat_2C2,{[hdrs_2C2;mat2cell(dat{2}{n},...
+        dat_2D2 = cat(1,dat_2D2,{[hdrs_2D2;mat2cell(dat{2}{n},...
             size(dat{2}{n},1),ones(1,size(dat{2}{n},2)))]});
     end
-    dat_2C = [dat_2C1,{dat_2C2}];
-    exportJson([destdir,'figure2',filesep,'data_figure2C.json'],...
-        [hdrs_2C;dat_2C]);
-    
-    disp('>> collect data for sum exp. fit model...')
-    dat = readData([rootdir,datdir],'wba',true);
-    dat_2C1 = mat2cell(dat{1},size(dat{1},1),ones(1,size(dat{1},2)));
-    dat_2C2 = {};
-    for n = 1:numel(dat{2})
-        dat_2C2 = cat(1,dat_2C2,{[hdrs_2C2;mat2cell(dat{2}{n},...
-            size(dat{2}{n},1),ones(1,size(dat{2}{n},2)))]});
-    end
-    dat_2C = [dat_2C1,{dat_2C2}];
-    exportJson([destdir,'figure2',filesep,'data_figure2C_sumexp.json'],...
-        [hdrs_2C;dat_2C]);
-end
-
-% figure 2D: D and model fidelity = f(tau_b2) for model I and II
-if any(contains(subfig,'figure2D'))
-    disp('process subfigure 2D...')
-    datdirI = 'dataset4';
-    datdirII = 'dataset5';
-    hdrs_2D = {'GT Db_I','GT tau_b1_I','GT tau_b2_I','GT tau_b3_I','Db_I',...
-        'std(Db_I)','MF_I','std(MF_I)','GT Db_II','GT tau_b1_II',...
-        'GT tau_b2_II','GT tau_b3_II','Db_II','std(Db_II)','MF_II',...
-        'std(MF_II)'};
-    
-    disp('>> collect data for DPH fit model...')
-    dat_2D = [readData([rootdir,datdirI],'tau'),...
-        readData([rootdir,datdirII],'tau')];
-    dat_2D = mat2cell(dat_2D,size(dat_2D,1),ones(1,size(dat_2D,2)));
+    dat_2D = [dat_2D1,{dat_2D2}];
     exportJson([destdir,'figure2',filesep,'data_figure2D.json'],...
         [hdrs_2D;dat_2D]);
     
     disp('>> collect data for sum exp. fit model...')
-    dat_2D = [readData([rootdir,datdirI],'tau',true),...
-        readData([rootdir,datdirII],'tau',true)];
-    dat_2D = mat2cell(dat_2D,size(dat_2D,1),ones(1,size(dat_2D,2)));
+    dat = readData([rootdir,datdir],'wba',true);
+    dat_2D1 = mat2cell(dat{1},size(dat{1},1),ones(1,size(dat{1},2)));
+    dat_2D2 = {};
+    for n = 1:numel(dat{2})
+        dat_2D2 = cat(1,dat_2D2,{[hdrs_2D2;mat2cell(dat{2}{n},...
+            size(dat{2}{n},1),ones(1,size(dat{2}{n},2)))]});
+    end
+    dat_2D = [dat_2D1,{dat_2D2}];
     exportJson([destdir,'figure2',filesep,'data_figure2D_sumexp.json'],...
         [hdrs_2D;dat_2D]);
+end
+
+% figure 2E: D and model accuracy = f(tau_b2) for model I and II
+if any(contains(subfig,'figure2E'))
+    disp('process subfigure 2E...')
+    datdirI = 'dataset5';
+    datdirII = 'dataset6';
+    hdrs_2E = {'GT Db_I','GT tau_b1_I','GT tau_b2_I','Db_I','std(Db_I)',...
+        'acc_I','std(acc_I)','GT Db_II','GT tau_b1_II','GT tau_b2_II',...
+        'Db_II','std(Db_II)','acc_II','std(acc_II)'};
+    
+    disp('>> collect data for DPH fit model...')
+    dat_2E = [readData([rootdir,datdirI],'tau'),...
+        readData([rootdir,datdirII],'tau')];
+    dat_2E = mat2cell(dat_2E,size(dat_2E,1),ones(1,size(dat_2E,2)));
+    exportJson([destdir,'figure2',filesep,'data_figure2E.json'],...
+        [hdrs_2E;dat_2E]);
+    
+    disp('>> collect data for sum exp. fit model...')
+    dat_2E = [readData([rootdir,datdirI],'tau',true),...
+        readData([rootdir,datdirII],'tau',true)];
+    dat_2E = mat2cell(dat_2E,size(dat_2E,1),ones(1,size(dat_2E,2)));
+    exportJson([destdir,'figure2',filesep,'data_figure2E_sumexp.json'],...
+        [hdrs_2E;dat_2E]);
+end
+
+% figure 2F: D and model accuracy = f(state connexions) 
+if any(contains(subfig,'figure2F'))
+    disp('process subfigure 2F...')
+    datdir = 'dataset9';
+    hdrs_2F = {'GT Db','GT schm','Db','std(Db)','acc','std(acc)'};
+    
+    disp('>> collect data for DPH fit model...')
+    dat = readData([rootdir,datdir],'schm');
+    dat_2F1 = mat2cell(dat{1},size(dat{1},1),ones(1,size(dat{1},2)));
+    dat_2F = [dat_2F1(1),dat(2),dat_2F1(2:end)];
+    exportJson([destdir,'figure2',filesep,'data_figure2F.json'],...
+        [hdrs_2F;dat_2F]);
+    
+    disp('>> collect data for sum exp. fit model...')
+    dat = readData([rootdir,datdir],'schm',true);
+    dat_2F1 = mat2cell(dat{1},size(dat{1},1),ones(1,size(dat{1},2)));
+    dat_2F = [dat_2F1(1),dat(2),dat_2F1(2:end)];
+    exportJson([destdir,'figure2',filesep,'data_figure2F_sumexp.json'],...
+        [hdrs_2F;dat_2F]);
 end
 
 % figure 3A: GT and inferred TPMs for quenched disorder, ML-DPH BICs and TPs, and computation time
 if any(contains(subfig,'figure3A'))
     disp('process subfigure 3A...')
-    datdir = 'dataset6';
+    datdir = 'dataset7';
     hdrs_3A11 = {'D','scheme','BIC_a','BIC_b','std(BIC_a)','std(BIC_b)'};
     hdrs_3A12 = {'STPM_a','std(STPM_a)','STPM_b','std(STPM_b)'};
     hdrs_3A13 = {'t','std(t)'};
@@ -166,7 +191,7 @@ end
 % figure 3B: GT and inferred TPM for dynamic disorder, ML-DPH BICs and TPs and computation time
 if any(contains(subfig,'figure3B'))
     disp('process subfigure 3B...')
-    datdir = 'dataset7';
+    datdir = 'dataset8';
     hdrs_3A11 = {'D','scheme','BIC_a','BIC_b','std(BIC_a)','std(BIC_b)'};
     hdrs_3A12 = {'STPM_a','std(STPM_a)','STPM_b','std(STPM_b)'};
     hdrs_3A13 = {'t','std(t)'};
@@ -250,6 +275,9 @@ switch type
         dat = cell(1,4);
     case 'wba'
         dat = cell(1,2);
+    case 'schm'
+        dat = cell(1,2);
+        dat{2} = {};
     otherwise
         dat = [];
 end
@@ -262,11 +290,21 @@ for f = 1:size(simlist)
 	val_a = simprm.val(1);
 	Db0 = sum(simprm.val==val_b);
     Da0 = sum(simprm.val==val_a);
-	wba0 = simprm.tp(2:end,1)./sum(simprm.tp(2:end,:),2);
+	wba0 = simprm.tp((Da0+1):end,1)./sum(simprm.tp((Da0+1):end,:),2);
     tau0 = (1./sum(simprm.tp,2))';
     taub0 = tau0(simprm.val==val_b);
     id0 = sortStates(simprm.val,tau0);
+    ip0 = simprm.ip(id0);
     tp0 = reorderMat(simprm.tp,id0);
+    isip0_a = ~~ip0(1:Da0)+sum(tp0((Da0+1):end,1:Da0),1);
+    istp0_a = ~~tp0(1:Da0,1:Da0);
+    isep0_a = ~~sum(tp0(1:Da0,(Da0+1):end),2);
+    isip0_b = ~~(ip0((Da0+1):end)+sum(tp0(1:Da0,(Da0+1):end),1));
+    istp0_b = ~~tp0((Da0+1):end,(Da0+1):end);
+    isep0_b = ~~sum(tp0((Da0+1):end,1:Da0),2);
+    schm0 = tp0;
+    schm0(~~eye(size(schm0))) = 0;
+    schm0 = double(schm0>0);
     J = numel(id0);
 	
 	% collect Db
@@ -284,11 +322,11 @@ for f = 1:size(simlist)
             ext_simres]);
     end
 	R = size(dphfle,1);
-	Db = zeros(1,R);
-	fdl = zeros(1,R);
+	Db = [];
+	acc = [];
     TPMs = [];
     BICs = [];
-    t_comp = zeros(1,R);
+    t_comp = [];
     STPMs = cell(1,2);
     plotdat = [];
 	for r = 1:R
@@ -304,13 +342,34 @@ for f = 1:size(simlist)
         tp_b = dphres{3}.tp_fit{2};
         k_b = tp_b;
         k_b(~~eye(size(k_b))) = 0;
-		Db(r) = size(tp_b,1);
+        schm = dphres{3}.schm{2};
+        if isempty(k_b) % ML-DPH did not converge
+            continue
+        end
+        
+		Db = cat(2,Db,size(tp_b,1));
 		Da = size(tp_a,1);
 		
         if ~strcmp(type,'model')
             % calculate model fidelity
-            wba = k_b(:,end)./sum(k_b,2);
-            fdl(r) = sum(wba)/Db(r)-sum(wba0)/Db0;
+            if Db(end)~=Db0
+                acc_r = 0;
+            else
+                TP = sum(schm(1,2:end-1) & isip0_b) + ...
+                    sum(schm(2:end-1,end) & isep0_b) + ...
+                    sum(sum(schm(2:end-1,2:end-1) & istp0_b));
+                TN = sum(~schm(1,2:end-1) & ~isip0_b) + ...
+                    sum(~schm(2:end-1,end) & ~isep0_b) + ...
+                    sum(sum(~schm(2:end-1,2:end-1) & ~istp0_b));
+                FP = sum(schm(1,2:end-1) & ~isip0_b) + ...
+                    sum(schm(2:end-1,end) & ~isep0_b) + ...
+                    sum(sum(schm(2:end-1,2:end-1) & ~istp0_b));
+                FN = sum(~schm(1,2:end-1) & isip0_b) + ...
+                    sum(~schm(2:end-1,end) & isep0_b) + ...
+                    sum(sum(~schm(2:end-1,2:end-1) & istp0_b));
+                acc_r = (TP+TN)/(TP+TN+FP+FN);
+            end
+            acc = cat(2,acc,acc_r);
             if strcmp(type,'wba')
                 simres = ...
                     load([datdir,filesep,setname,filesep,simfle(r,1).name]);
@@ -324,9 +383,9 @@ for f = 1:size(simlist)
                     T0{2},a0{2}));
             end
             
-        elseif Db(r)==Db0 && Da==Da0 % only for success
+        elseif Db(end)==Db0 && Da==Da0 % only for success
             % get computation time
-            t_comp(r) = dphres{3}.t_dphtest;
+            t_comp = cat(2,t_comp,dphres{3}.t_dphtest);
             
             % collect ML-DPH sub-transition matrices (STPMs)
             tau_a = (1./sum(k_a,2))';
@@ -334,7 +393,7 @@ for f = 1:size(simlist)
             STPMs{1} = cat(3,STPMs{1},reorderMat(tp_a,...
                 sortStates(repmat(val_a,1,Da),tau_a)));
             STPMs{2} = cat(3,STPMs{2},reorderMat(tp_b,...
-                sortStates(repmat(val_b,1,Db(r)),tau_b)));
+                sortStates(repmat(val_b,1,Db(end)),tau_b)));
             
             % collect BW transition probability matrices (TPMs)
             bwfle = [datdir,filesep,filesep,setname,filesep,setname,'_',...
@@ -363,13 +422,17 @@ for f = 1:size(simlist)
 	% calculate std
     switch type
         case 'tau'
-            dat = cat(1,dat,[Db0,sort(taub0),mean(Db),std(Db),mean(fdl),...
-                std(fdl)]);
+            dat = cat(1,dat,[Db0,sort(taub0),mean(Db),std(Db),mean(acc(acc>0)),...
+                std(acc(acc>0))]);
         case 'wba'
             dat{1} = cat(1,dat{1},[Db0,mean(wba0),mean(Db),std(Db),...
-                mean(fdl),std(fdl)]);
+                mean(acc(acc>0)),std(acc(acc>0))]);
             dat{2} = cat(1,dat{2},...
                 {dthiststats(sortrows(plotdat,1),dtbin)});
+        case 'schm'
+            dat{1} = cat(1,dat{1},[Db0,mean(Db),std(Db),mean(acc(acc>0)),...
+                std(acc(acc>0))]);
+            dat{2} = cat(1,dat{2},schm0);
         case 'model'
             TPMs_std = std(TPMs,[],3);
             TPMs = mean(TPMs,3);
@@ -390,7 +453,7 @@ for f = 1:size(simlist)
             return
             
         case 'none'
-            dat = cat(1,dat,[Db0,mean(Db),std(Db),mean(fdl),std(fdl)]);
+            dat = cat(1,dat,[Db0,mean(Db),std(Db),mean(acc(acc>0)),std(acc(acc>0))]);
     end
 end
 switch type
@@ -616,11 +679,36 @@ for c = 1:C
             end
         end
     else
-        R = size(dat,1);
-        for r = 1:R
-            writeJson(f,dat{r,1},ntab+1);
-            if r~=R
-                fprintf(f,',');
+        [R,ndat] = size(dat);
+        if iscell(dat)
+            for r = 1:R
+                writeJson(f,dat{r,1},ntab+1);
+                if r~=R
+                    fprintf(f,',');
+                end
+            end
+        else
+            if R>1
+                fprintf(f,'[');
+            end
+            for r = 1:R
+                if ndat>0
+                    fmtdat = '%d';
+                    if ndat>1
+                        fprintf(f,'[');
+                        fmtdat = cat(2,fmtdat,repmat(',%d',[1,ndat-1]));
+                    end
+                    fprintf(f,fmtdat,dat(r,:));
+                    if ndat>1
+                        fprintf(f,']');
+                    end
+                end
+                if r~=R
+                    fprintf(f,',');
+                end
+            end
+            if R>1
+                fprintf(f,']');
             end
         end
     end

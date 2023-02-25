@@ -44,20 +44,31 @@ if isempty(dt)
     return
 end
 
-[D,mdl,BIC,minBIC] = ...
-    script_findBestModel(dt(:,[1,4,2,3]),Dmax,states,expT,dt_bin,T,sumexp,...
-    dest);
+[D,mdlopt,mdl] = script_findBestModel(dt(:,[1,4,2,3]),Dmax,states,expT,...
+    dt_bin,T,sumexp,dest);
 
 BICres = [];
-for D0 = 1:numel(BIC)
-    S = size(BIC{D0},2);
-    BICres = cat(1,BICres,[repmat(D0,[S,1]),(1:S)',BIC{D0}']);
+for v = 1:numel(D)
+    for Dtest = 1:size(mdl{v}{1},1)
+        nfp = sum(sum(mdl{v}{1}(Dtest,1).schm))-1;
+        BICs = mdl{v}{1}(Dtest,1).BIC;
+        BICres = cat(1,BICres,[v,Dtest,0,nfp,BICs]);
+    end
+    S = size(mdl{v}{2},1);
+    for s = 1:S
+        Ds = numel(mdl{v}{2}(s,1).pi_fit);
+        nfp = sum(sum(mdl{v}{2}(s,1).schm))-1;
+        BICs = numel(mdl{v}{2}(s,1).BIC);
+        BICres = cat(1,BICres,[v,Ds,s,nfp,BICs]);
+    end
 end
 
 degen = [];
+minBIC = [];
 for v = 1:numel(states)
     degen = cat(2,degen,repmat(v,[1,D(v)]));
+    minBIC = cat(1,minBIC,[mdlopt.BIC(v),D(v)]);
 end
 states = states(degen);
-res = {minBIC,BICres,mdl,states};
+res = {minBIC,BICres,mdlopt,states};
 
