@@ -1,6 +1,6 @@
-function [degen,mdl,BIC,minBIC] = script_findBestModel(dt,Dmax,states,...
-    expT,dt_bin,T,sumexp,savecurve)
-% [degen,mdl,BIC,minBIC] = script_findBestModel(dt,Dmax,states,expT,dt_bin,T,sumexp,savecurve)
+function [D,mdlopt,mdl] = script_findBestModel(dt,Dmax,states,...
+    expT,bin,T,sumexp,savecurve)
+% [D,mdlopt,mdl] = script_findBestModel(dt,Dmax,states,expT,bin,T,sumexp,savecurve)
 %
 % Import dwell times from .clst file
 % Find and return most sufficient model complexities (in terms of number of degenerated levels) for each state value
@@ -10,116 +10,115 @@ function [degen,mdl,BIC,minBIC] = script_findBestModel(dt,Dmax,states,...
 % Dmax: maximum number of degenerated levels
 % states: [1-by-V] state values in dt
 % expT: bin time (s)
-% dt_bin: binning factor for dwell times prior building histogram
+% bin: binning factor for dwell times prior building histogram
 % T: number of restart
 % sumexp: (1) to fit a sume of exponential (0) to fit DPH
 % savecurve: empty or destination folder to save best fit curves
-% degen: [1-by-V] most sufficient model complexity (number of degenerated levels per state value)
-% mdl: structures containing best DPH fit parameters for the most sufficient model
-%   mdl.pi_fit: {1-by-V} starting probabilities
-%   mdl.tp_fit: {1-by-V} transition probabilities among degenerated states of a same state value
-%   mdl.logL: {1-by-V} log likelihoods for best fits
-%   mdl.N: [1-by-V] number of data
-%   mdl.schm: transition scheme
-% BIC: {1-by-Dmax}[V-by-S] BIC for all complexities
-% minBIC = [V-by-3] min-BIC (1st column), most sufficient state degeneracy
-%   (2nd) and transition scheme index (3rd)
+% D: [1-by-V] most sufficient model complexity (number of degenerated 
+%  levels per state value)
+% mdlopt: [V-by-1] structure array containing best DPH fit parameters for 
+%  the most sufficient model
+%   mdlopt.pi_fit: {1-by-V} starting probabilities
+%   mdlopt.tp_fit: {1-by-V} transition probabilities among degenerated 
+%    states of a same state value
+%   mdlopt.logL: {1-by-V} log likelihoods for best fits
+%   mdlopt.N: [1-by-V] number of data
+%   mdlopt.schm: {1-by-V} transition schemes
+% mdl: {V-by-1}[S-by-1] structure array containing DPH fit parameters 
+%  for model qualifications
+
+% defaults
+reffle = 'ref-table-schemes.mat'; % source file containing all transition schemes
+
+% load already found possible transitions schemes
+src = fileparts(mfilename('fullpath'));
+reffle = [src,filesep,reffle];
+schmD = {};
+schm_tp = {};
+ref.schmD = schmD;
+ref.schm_tp = schm_tp;
+if exist(reffle,'file')
+    ref = load(reffle);
+    schmD = ref.schmD;
+    schm_tp = ref.schm_tp;
+end
 
 % initialize computation time
 t_comp = tic;
 
-% Get optimum DPHs for each model complexity
-disp('Train DPH distributions on binned dwelltime histograms...')
+% get dwell time histograms
 V = numel(states);
-mdl = cell(1,Dmax);
-logL = cell(1,Dmax);
-for D = 1:Dmax
-    fprintf('for %i degenerated states:\n',D);
-    for v = 1:V
-        if sumexp
-            schm0 = [false(D),true(D,1)];
-        else
-            schm0 = ~eye(D,D+1);
-%             schm0 = addExitProb2TransSchemes(getTransSchemes(D));
-        end
+dthist = cell(1,V);
+dthist_bin = cell(1,V);
+for v = 1:V
+    dt_v = dt(dt(:,3)==v,1);
+    if isempty(dt_v)
+        continue
     end
-    S = size(schm0,3);
-    logL{D} = -Inf(V,S);
-    mdl{D} = struct([]);
-    for s = 1:S
-        schm = cell(1,V);
-        for v = 1:V
-            schm{v} = schm0(:,:,s);
-        end
-        mdl{D} = cat(1,mdl{D},...
-            script_inferPH(dt,states,expT,dt_bin,T,repmat(D,1,V),schm,''));
-        
-        LogL_v = [];
-        for v = 1:V
-            LogL_v = cat(1,LogL_v,mdl{D}.logL(v));
-        end
-        logL{D}(:,s) = LogL_v;
-    end
+    dt_v(:,1) = dt_v(:,1)/expT;
+    
+    % original dwell time histogram
+    edg = 0.5:(max(dt_v)+0.5);
+    x = mean([edg(2:end);edg(1:end-1)],1);
+    P = histcounts(dt_v,edg);
+    dthist{v} = [x',P'];
+    
+    % binned dwell time histogram
+    dt_bin = bin*round(dt_v/bin); 
+    edg = (bin/2):(max(dt_bin)+bin/2);
+    x = mean([edg(2:end);edg(1:end-1)],1);
+    P = histcounts(dt_bin,edg);
+    dthist_bin{v} = [x',P'];
 end
 
-% calculate BIC for each DPH
-Nv = mdl{1}(1).N;
-BIC = cell(1,Dmax);
-BIC{D} = Inf(V,S);
-for D = 1:Dmax
-    S = numel(mdl{D});
-    for s = 1:S
-        df = (D-1)+sum(sum(mdl{D}(s).schm{1})); % (D-1) initial prob, trans prob
-        for v = 1:V
-            BIC{D}(v,s) = df*log(Nv(v))-2*logL{D}(v,s);
-        end
-    end
+% Perorm ML-DPH
+dispProgress('Perform ML-DPH on binned dwelltime histograms...\n',0);
+mdl = cell(1,V);
+schm_opt = cell(1,V);
+for v = 1:V
+    fprintf('for state %i/%i:\n',v,V);
+    [schm_opt{v},mdl{v},schmD,schm_tp] = ...
+        MLDPH(dthist_bin{v},T,sumexp,Dmax,schmD,schm_tp);
 end
 
-% select minimum BIC
-degen = zeros(1,V);
-minBIC = repmat([Inf,0,0],V,1);
-for D = 1:Dmax
-    for v = 1:V
-        [val,s] = min(BIC{D}(v,:));
-        if val<minBIC(v,1)
-            minBIC(v,:) = [val,D,s];
-        end
-    end
+% append reference file
+if ~isequal(schmD,ref.schmD) || ~isequal(schm_tp,ref.schm_tp)
+    save(reffle,'schmD','schm_tp','-mat');
 end
 
 % show most sufficient state configuration
 id = [];
+D = zeros(1,V);
 for v = 1:V
-    degen(v) = minBIC(v,2);
-    id = cat(2,id,repmat(v,[1,degen(v)]));
+    D(v) = size(schm_opt{v},1)-2;
+    id = cat(2,id,repmat(v,[1,D(v)]));
 end
 fprintf(['Most sufficient state configuration:\n[%0.2f',...
     repmat(',%0.2f',[1,numel(states(id))-1]),']\n'],states(id));
 
 % infer "true" DPH parameters
-disp('Optimize DPH distributions on authentic dwell time histograms...')
-schm = cell(1,V);
+fprintf('ML-optimization of DPH on authentic dwell time histograms...\n');
+mdlopt.pi_fit = cell(1,V);
+mdlopt.tp_fit = cell(1,V);
+mdlopt.schm = cell(1,V);
+mdlopt.logL = zeros(1,V);
+mdlopt.N = zeros(1,V);
+mdlopt.BIC = zeros(1,V);
 for v = 1:V
-    schm{v} = mdl{minBIC(v,2)}(minBIC(v,3)).schm{v};
+    ffile = [savecurve,sprintf('_state%iD%i_dphplot',v,D(v))];
+    mdl_v = script_inferPH(dthist{v},T,schm_opt{v},ffile);
+    mdlopt.pi_fit{v} = mdl_v.pi_fit;
+    mdlopt.tp_fit{v} = mdl_v.tp_fit;
+    mdlopt.schm{v} = mdl_v.schm;
+    mdlopt.logL(v) = mdl_v.logL;
+    mdlopt.N(v) = mdl_v.N;
+    nfp = sum(sum(mdl_v.schm))-1;
+    mdlopt.BIC(v) = nfp*log(mdl_v.N)-2*mdl_v.logL;
 end
-mdl = script_inferPH(dt,states,expT,1,T,degen,schm,savecurve);
 
 % save computation time
-mdl.t_dphtest = toc(t_comp);
+mdlopt.t_dphtest = toc(t_comp);
 
 fprintf('Most sufficient model complexity found in %0.0f seconds\n',...
     toc(t_comp));
-
-
-function schm = addExitProb2TransSchemes(schm)
-
-J = size(schm,1);
-for nb1 = 1:J
-    for id1 = 1:nb1
-        for col = 1:J
-        end
-    end
-end
-
 
