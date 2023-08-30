@@ -16,7 +16,7 @@ function res = DPHtest_buildModel(prm,simtraj)
 % res: structure with fields:
 %  res.dt_gt: {1-by-N} [ndt_gt-by-5] simulated true dwell times (time,state indexes, state values)
 %  res.dt_obs: {1-by-N} [ndt_obs-by-3] simulated observed dwell times (time,state indexes, state values)
-%  res.seq: (opt) [L-by-N] simulated state sequences
+%  res.seq: (opt) {1-by-N} [L-by-1] simulated state sequences
 %
 % example:
 % >> prm.N = 15;

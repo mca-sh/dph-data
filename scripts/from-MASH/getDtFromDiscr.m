@@ -1,4 +1,4 @@
-function dt = getDtFromDiscr(discr, rate)
+function dt = getDtFromDiscr(discr, splt)
 
 % Get states for each transition and dwell-times
 dt = [];
@@ -23,9 +23,9 @@ for i = 2:size(discr,1)
     end
 end
 if isempty(dt)
-    dt = [rate discr(1) NaN];
+    dt = [splt discr(1) NaN];
 else
-    dt(:,1) = dt(:,1)*rate;
+    dt(:,1) = dt(:,1)*splt;
 end
 
 
