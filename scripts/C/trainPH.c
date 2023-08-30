@@ -103,8 +103,11 @@ bool optDPH(double* T, double* t, double* a, double* logL, const
 	buildIdMat(id_mat,2*J,2*J);
 	buildIdMat(id_Jv,J,1);
 	buildIdMat(id_Jh,1,J);
+    
+//     // calculate initial likelihood (discrete PH)
+//     *logL = 0;
 	
-	// calculate initial likelihood
+	// calculate initial likelihood (continuous PH)
 	*logL = calcDPHlogL( (const double*) T, (const double*) a, 
             (const double*) t, cnts,J,nDt, (const int**) id_T, 
             (const int**) id_P, (const int**) id_Jv);
@@ -129,23 +132,29 @@ bool optDPH(double* T, double* t, double* a, double* logL, const
                 (const double*) t,nDt,J,(const int**) id_T,
                 (const int**) id_P,(const int**) id_Jh,(const int**) id_Jv,
                 (const int**) id_mat, &totCnt);
+        
+//         //calculates likelihood (discrete PH)
+//         *logL = calcDPHlogL_2((const double*) T, (const double*) a, 
+//                 (const double*) t, (const double*) B, (const double*) Nij, 
+//                 (const double*) Ni,J, (const int**) id_T);
+//         if (!mxIsFinite(*logL)){ break; }
         		
 		// M-step
 		MstepDPH(a,T,t,(const double*) B,(const double*) Nij,
                 (const double*) Ni,totCnt,J,(const int**) id_T);
 		
-		// calculates likelihood
+		// calculates likelihood (continuous PH)
 		*logL = calcDPHlogL((const double*) T,(const double*) a,
                 (const double*) t,cnts,J,nDt,(const int**) id_T,
                 (const int**) id_P,(const int**) id_Jv);
         if (!mxIsFinite(*logL)){ break; }
 
 		// check for convergence
-		if ((*logL-logL_prev)<DLMIN){ cvg = 1; }
-		
-        // show progress
 		dmax = calcMaxDev((const double*) T,(const double*) T_prev,
                 (const double*) a,(const double*) a_prev,J);
+		if (m>1 && ((*logL-logL_prev)<DLMIN || dmax<DMIN)){ cvg = 1; }
+		
+        // show progress
 		*nb = dispDPHres(m,*logL-logL_prev,dmax,(const double*) T,
                 (const double*) a,J,(const int**) id_T,*nb);
 	}
@@ -417,20 +426,20 @@ int dispDPHres(double m,double dL, double dmax, const double* T,
 	nb = mexPrintf("iteration %.0f: dL=%.3e (dLmin=%.0e) d=%.3e\n",m,dL,
             DLMIN,dmax);
 	
-	// write probabilities
-	/*nb = nb + mexPrintf("Initial probabilities:\n");
-	for (i=0; i<J; i++){
-		nb = nb + mexPrintf("\t%.4f",a[i]);
-	}
-	nb = nb + mexPrintf("\n");
-	
-	nb = nb + mexPrintf("Transition probabilities:\n");
-	for (i=0; i<J; i++){
-		for (j=0; j<J; j++){
-			nb = nb + mexPrintf("\t%.4f",T[id_T[i][j]]);
-		}
-		nb = nb + mexPrintf("\n");
-	}*/
+// 	// write probabilities
+// 	nb = nb + mexPrintf("Initial probabilities:\n");
+// 	for (i=0; i<J; i++){
+// 		nb = nb + mexPrintf("\t%.6f",a[i]);
+// 	}
+// 	nb = nb + mexPrintf("\n");
+// 	
+// 	nb = nb + mexPrintf("Transition probabilities:\n");
+// 	for (i=0; i<J; i++){
+// 		for (j=0; j<J; j++){
+// 			nb = nb + mexPrintf("\t%.6f",T[id_T[i][j]]);
+// 		}
+// 		nb = nb + mexPrintf("\n");
+// 	}
 	mexEvalString("drawnow;");
 	
 	return nb;
