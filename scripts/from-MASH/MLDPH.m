@@ -1,88 +1,107 @@
-function [schmopt,mdl,schmref_D,schmref_tp] = MLDPH(dt,T,sumexp,Dmax,...
-    schmref_D,schmref_tp)
+function [schmopt,mdl] = MLDPH(dt,T,sumexp,Dmax)
 
-% initializes output
-schmopt = [];
-mdl = {};
-BIC = Inf;
+% defaults
+schmstr = {'hyper exponential','erlang'};
 
 % ML-DPH inference: determine state degeneracy
-cvg = false;
-D = 1;
-while ~cvg && D<=Dmax
-    fprintf(['for ', num2str(D),' states:\n']);
-    mdl = cat(2,mdl,cell(1,1));
-    
-    % adjust size of reference schemes table
-    if numel(schmref_D)<D
-        schmref_D = cat(2,schmref_D,cell(1,D-numel(schmref_D)));
-    end
-    
-    % collect all valid transition schemes
-    if sumexp
-        ntp = 0;
-    else
-        ntp = 0:D*(D-1);
-    end
-    schm_D = [];
-    for n = ntp
-        
-        % from ref table
-        if numel(schmref_D{D})>=(n+1) && ~isempty(schmref_D{D}{n+1})
-            schm_n = schmref_D{D}{n+1};
-        
-        % find all possible schemes (can be time consuming)
-        else
-            [schm_n,schmref_tp] = ...
-                getDPHtransSchemesWithNTransProb(n,D,D,schmref_tp);
-            if numel(schmref_D{D})<(n+1)
-                schmref_D{D} = cat(2,schmref_D{D},...
-                    cell(1,(n+1)-numel(schmref_D{D})));
-            end
-            schmref_D{D}{(n+1)} = schm_n;
-        end
-        if ~iscell(schm_n) && numel(schm_n)==1 && isinf(schm_n)
-            fprintf('no transition scheme\n');
-            continue
-        end
-        if isempty(schm_n)
-            fprintf(['maximum model complexity has been reached ',...
-                '(Dmax=',num2str(D),'): ML-DPH did not converge\n']);
-            break
-        end
+BIC_all = [];
+cvg_all = [];
+mdl = [];
+for D = 1:Dmax
+    fprintf(['for ', num2str(D),' states (%i max.):\n'],Dmax);
 
-        % append schemes
-        S = numel(schm_n);
-        for s = 1:S
-            schm_D = cat(3,schm_D,schm_n{s});
-        end
+    % collects hyperexponential and Erlang transition schemes
+    schm_D = collectstransscheme(D,'hypexp');
+    if (D>1 && ~sumexp)
+        schm_D = cat(3,schm_D,collectstransscheme(D,'erlang'));
     end
     
-    % test schemes one by one
-    S = size(schm_D,3);
-    BIC_D = [];
-    for s = 1:S
-        fprintf(['scheme ',num2str(s),'/',num2str(S),':\n']);
-        mdl_s = script_inferPH(dt,T,schm_D(:,:,s),'');
+    % test schemes one after the other
+    for s = 1:size(schm_D,3)
+        fprintf(['scheme ',schmstr{s},':\n']);
+        mdl_sD = script_inferPH(dt,T,schm_D(:,:,s),'');
 
         % calculate BIC
-        nfp = sum(sum(mdl_s.schm))-1;
-        mdl_s.BIC = nfp*log(mdl_s.N)-2*mdl_s.logL;
-
-        mdl{D} = cat(1,mdl{D},mdl_s);
-        BIC_D = cat(2,BIC_D,mdl_s.BIC);
-    end
-
-    % model selection
-    BIC_D(isinf(BIC_D)) = Inf;
-    [BICmin,sopt] = min(BIC_D);
-    if BICmin>BIC
-        cvg = true;
-        fprintf('ML-DPH successfully converge for D=%i!\n',D-1);
-    else
-        BIC = BICmin;
-        schmopt = mdl{D}(sopt).schm;
-        D = D+1;
+        nfp = sum(sum(mdl_sD.schm))-1;
+        mdl_sD.BIC = nfp*log(mdl_sD.N)-2*mdl_sD.logL;
+        
+        % check model divergence and state doublons
+        mdl_sD.cvg = isdphvalid(mdl_sD.tp_fit) & ~isdoublon(mdl_sD.tp_fit);
+        
+        % append results
+        mdl = cat(1,mdl,mdl_sD);
+        BIC_all = cat(2,BIC_all,mdl_sD.BIC);
+        cvg_all = cat(2,cvg_all,mdl_sD.cvg);
     end
 end
+
+% model selection
+sopt = find(BIC_all==min(BIC_all(~~cvg_all)));
+schmopt = mdl(sopt(1)).schm;
+
+
+function cvg = isdphvalid(tp)
+
+cvg = false;
+if isempty(tp) || any(tp(~~eye(size(tp)))<exp(-0.5))
+    return
+end
+
+cvg = true;
+
+
+function dbl = isdoublon(tp)
+
+% defaults
+maxdiff = 1E-4; % maximum transition probability gap between different states
+
+dbl = false;
+V = size(tp,1);
+for v1 = 1:V
+    for v2 = 1:V
+        if v2==v1
+            continue
+        end
+        vs = 1:V;
+        vs([v1,v2]) = [];
+        maxdiff12 = max(abs(tp(v1,[v1,vs])-tp(v2,[v2,vs])));
+        if maxdiff12<maxdiff
+            dbl = true;
+            return
+        end
+    end
+end
+
+
+
+function schm = collectstransscheme(D,type)
+% schm = collectstransscheme(D,type)
+%
+% D: number of states
+% type: 'hypexp', 'erlang' or 'all'
+% schm: transition scheme
+
+switch type
+    case 'hypexp'
+        ip = ones(1,D);
+        ep = ones(D,1);
+        tp = zeros(D);
+        
+    case 'erlang'
+        ip = [1,zeros(1,D-1)];
+        ep = [zeros(D-1,1);1];
+        tp = zeros(D);
+        for d = 1:D-1
+            tp(d,d+1) = 1;
+        end
+        
+    otherwise % all
+        ip = [1,zeros(1,D-1)];
+        ep = [zeros(D-1,1);1];
+        tp = ones(D);
+        tp(~~eye(D)) = 0;
+end
+
+schm = [0,ip,0; zeros(D,1),tp,ep; zeros(1,D+2)];
+
 
