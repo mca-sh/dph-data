@@ -1,5 +1,6 @@
-function [tp_iter,tp_err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T)
-% [tp,tp_err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T)
+function [tp_iter,tp_err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T,...
+    schm)
+% [tp,tp_err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T,schm)
 %
 % Find the probability matrix that describes the input dwell time set
 %
@@ -11,6 +12,7 @@ function [tp_iter,tp_err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T)
 %   expPrm.excl: (1) to exclude first and last dwell times of each sequence, (0) otherwise
 % tp0: [J-by-J] matrix starting guess
 % T: number of restart
+% schm: [J-by-J] allowing (1) or forbidding (0) transitions
 % tp_iter: [J-by-J] best inferrence matrix
 % tp_err: [J-by-J-by-2] negative and positive absolute mean deviation
 % ip: [1-by-J] initial state probabilities
@@ -45,9 +47,10 @@ end
 J = numel(states);
 if isempty(tp0)
     tp0 = rand(J)/10;
-    tp0(~~eye(J)) = 0;
-    tp0(~~eye(J)) = 1-sum(tp0,2);
 end
+tp0(~schm) = 0;
+tp0(~~eye(J)) = 0;
+tp0(~~eye(J)) = 1-sum(tp0,2);
 
 % measure computation time
 t = tic;
@@ -73,6 +76,7 @@ for restart = 1:T
     % generate new random matrix
     if restart>1
         tp0 = rand(J)/10;
+        tp0(~schm) = 0;
         tp0(~~eye(J)) = 0;
         tp0(~~eye(J)) = 1-sum(tp0,2);
     end

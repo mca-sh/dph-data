@@ -1,4 +1,4 @@
-function [D,mdlopt,mdl] = script_findBestModel(dt,Dmax,states,...
+function [D,mdlopt,mdl,dthist] = script_findBestModel(dt,Dmax,states,...
     expT,bin,T,sumexp,savecurve)
 % [D,mdlopt,mdl] = script_findBestModel(dt,Dmax,states,expT,bin,T,sumexp,savecurve)
 %
@@ -26,6 +26,7 @@ function [D,mdlopt,mdl] = script_findBestModel(dt,Dmax,states,...
 %   mdlopt.schm: {1-by-V} transition schemes
 % mdl: {V-by-1}[S-by-1] structure array containing DPH fit parameters 
 %  for model qualifications
+% dthist: {1-by-V} dwell time histograms
 
 % defaults
 reffle = 'ref-table-schemes.mat'; % source file containing all transition schemes
@@ -77,8 +78,7 @@ mdl = cell(1,V);
 schm_opt = cell(1,V);
 for v = 1:V
     fprintf('for state %i/%i:\n',v,V);
-    [schm_opt{v},mdl{v},schmD,schm_tp] = ...
-        MLDPH(dthist_bin{v},T,sumexp,Dmax,schmD,schm_tp);
+    [schm_opt{v},mdl{v}] = MLDPH(dthist_bin{v},T,sumexp,Dmax);
 end
 
 % append reference file
@@ -105,7 +105,7 @@ mdlopt.logL = zeros(1,V);
 mdlopt.N = zeros(1,V);
 mdlopt.BIC = zeros(1,V);
 for v = 1:V
-    ffile = [savecurve,sprintf('_state%iD%i_dphplot',v,D(v))];
+    ffile = [savecurve,sprintf('_dph_state%iD%i_dphplot',v,D(v))];
     mdl_v = script_inferPH(dthist{v},T,schm_opt{v},ffile);
     mdlopt.pi_fit{v} = mdl_v.pi_fit;
     mdlopt.tp_fit{v} = mdl_v.tp_fit;
