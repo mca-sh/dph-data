@@ -16,10 +16,16 @@ function res = BW_analysis(simprm,dphprm,dt,seq,dphres,T,dphguess)
 % dphguess: (1) to use ML-DPH outcome in initial TPM guess, (0) to use only random initial TPM guesses
 % res: {1-by-4} BW results
 
+% defaults
+minpercent = 0.1; % min. sample % that must show one slow transition to be valid
+
 % get project parameters
 minBIC = dphres{1};
 mdl = dphres{3};
 states = dphres{4};
+
+% initializes time count
+t0 = tic;
 
 % get state sequences
 dt_new = [];
@@ -63,12 +69,12 @@ end
 clstPop = clstPop/sum(sum(clstPop));
 
 % calculate initial transition prob matrix
+D = zeros(1,V);
+for v = 1:V
+    D(v) = minBIC(v,2);
+end
+J = sum(D);
 if dphguess
-    D = zeros(1,V);
-    for v = 1:V
-        D(v) = minBIC(v,2);
-    end
-    J = sum(D);
     tp0 = zeros(J);
     j1 = 0;
     for v1 = 1:V
@@ -95,7 +101,16 @@ expPrm.Ls = Ls;
 expPrm.dt = dt(:,[1,4,end-1,end]);
 expPrm.excl = dphprm.excl;
 expPrm.seq = seq;
+eps = minpercent*N/sum(Ls);
+schm = true(J);
+tp = ones(J);
+iter = 1;
+while iter==1 || any(tp(schm)<eps)
+    schm = schm & tp>=eps;
+    [tp,err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T,schm); % transition prob
+    iter = iter+1;
+end
 
-[tp,err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T); % transition prob
+res = {tp,err,ip,simdat,toc(t0)};
 
-res = {tp,err,ip,simdat};
+
