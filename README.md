@@ -1,4 +1,4 @@
-This repositary contains all data and MATLAB scripts produced for the manuscript **Using Acyclic Discrete Phase-type Distributions to Model Kinetic Heterogeneity in Ensemble Dwell time histograms**.
+This repository contains all data and MATLAB scripts produced for the manuscript **Using Acyclic Discrete Phase-type Distributions to Model Kinetic Heterogeneity in Ensemble Dwell time histograms**.
 
 Folders are structured as follows:
 
@@ -19,7 +19,7 @@ dph-data/
 |   |       \-- <prefix>_10_mldphres.mat
 |   |   |-- dataset<D><S><N>_linbin_<F>.png      # Fit distribution plots
 |   |   \-- ...
-|   |-- dataset<D><S><N>_linbin_<F>.png          # Ground truth distirbution plots for <N>=0
+|   |-- dataset<D><S><N>_linbin_<F>.png          # Ground truth distribution plots for <N>=0
 |   |-- ...
 |   |-- <prefix>_simprm.mat                      # Simulation parameters file
 |   |-- <prefix>_1_simres.mat                    # Simulated data file
