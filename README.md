@@ -29,7 +29,7 @@ dph-data/
 |-- scripts/                                     # MATLAB scripts for analysis pipeline
 |   |-- PHtest_analysisRoutine.m                 # Entry point of the analysis pipeline
 |   \-- ...
-\-- readme.txt
+\-- README.md
 ```
 
 Conventions for directory and file naming are as follows:
