@@ -39,7 +39,7 @@ Conventions for directory and file naming are as follows:
    - `<D>` : Aggregate size.
    - `<S>` : Reaction scheme:
    		   - 0 = all non-redundant (or,  for `<D>`=4, a subset of 100) reaction schemes
-   		   - 1 = fully coupled reaction scheme, with $w_{ba}=0$ to $1$ and $\frac{tau_{b2}}{tau_{b2}}=1$ to $10$
+   		   - 1 = fully coupled reaction scheme, with $w_{ba}=0$ to $1$ and $\frac{tau_{b2}}{tau_{b1}}=1$ to $10$
    - `<N>` : Sample size index:
            - 0 = 500 samples
            - 1 = 5,000 samples
