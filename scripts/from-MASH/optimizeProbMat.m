@@ -1,0 +1,138 @@
+function [tp_iter,tp_err,ip,simdat,nb] = optimizeProbMat(states,expPrm,tp0,...
+    T,schm,verbose)
+% [tp,tp_err,ip,simdat] = optimizeProbMat(states,expPrm,tp0,T,schm)
+%
+% Find the probability matrix that describes the input dwell time set
+%
+% states: [1-by-J] state values
+% expPrm: experimental parameters used in simulation with fields:
+%   expPrm.dt: [nDt-by-3] dwell times (seconds) and state indexes before and after transition
+%   expPrm.Ls: [1-by-N] experimental trajectory lengths
+%   expPrm.expT: binning time
+%   expPrm.excl: (1) to exclude first and last dwell times of each sequence, (0) otherwise
+% tp0: [J-by-J] matrix starting guess
+% T: number of restart
+% schm: [J-by-J] allowing (1) or forbidding (0) transitions
+% dispaction: 1 to show progress in command window, 0 to mute
+% tp_iter: [J-by-J] best inferrence matrix
+% tp_err: [J-by-J-by-2] negative and positive absolute mean deviation
+% ip: [1-by-J] initial state probabilities
+% simdat: structure containing probabilities calculated from simulated data
+%	simdat.ip initial state probabilities
+%	simdat.dt dwell times
+%   simdat.k_exp transition rate coefficients
+%   simdat.n_exp number of transitions
+%   simdat.w_exp transition probabiltiies
+%   simdat.tp_exp transition matrix
+% nb: nb. of characters printed in command window
+
+% default
+% tpmin = 1E-5; % minimum transition probability
+plotIt = false;
+
+% create figure for plot
+if plotIt
+   h_fig1 = figure('windowstyle','docked');
+else
+    h_fig1 = [];
+end
+
+% identify degenerated states
+vals = unique(states);
+V = numel(vals);
+degen = cell(1,V);
+for v = 1:V
+    degen{v} = find(states==vals(v));
+end
+
+% build starting guess for transition probabilities
+J = numel(states);
+if isempty(tp0)
+    tp0 = rand(J)/10;
+end
+tp0(~schm) = 0;
+tp0(~~eye(J)) = 0;
+tp0(~~eye(J)) = 1-sum(tp0,2);
+
+% measure computation time
+t = tic;
+
+% build event matrix used in Baum-Welch algorithm
+B0 = zeros(V,J);
+for v = 1:V
+    B0(v,degen{v}) = 1;
+end
+
+% minimum transition probability possible
+tpmin = 1/sum(expPrm.Ls);
+
+tp_all = NaN(J,J,T);
+ip_all = NaN(T,J);
+gof_all = -Inf(1,T);
+nb = 0;
+for restart = 1:T
+    
+    if verbose
+        nb = dispProgress(sprintf('restart %i/%i:\n',restart,T),nb);
+    end
+    
+    % generate new random matrix
+    if restart>1
+        tp0 = rand(J)/10;
+        tp0(~schm) = 0;
+        tp0(~~eye(J)) = 0;
+        tp0(~~eye(J)) = 1-sum(tp0,2);
+    end
+    tp_iter = tp0;
+    
+    % recover matrix calculated from simulated data
+    if restart==1 && plotIt
+        plotKinMdlSim(degen,tp_iter,ones(1,J)/J,expPrm,h_fig1);
+    end
+
+    [cvg,tp_iter,ip,bestgof,nb2] = baumwelch(tp_iter,B0,expPrm.seq,...
+        ones(1,J)/J,~~verbose);
+    nb = nb+nb2;
+    if ~cvg
+        bestgof = -Inf;
+    end
+    
+    if plotIt
+        tp_sim = tp_iter;
+        tp_sim(tp_sim<tpmin) = 0;
+        plotKinMdlSim(degen,tp_sim,ip,expPrm,h_fig1);
+    end
+    
+    % store best restart
+    tp_all(:,:,restart) = tp_iter;
+    ip_all(restart,:) = ip;
+    gof_all(restart) = bestgof;
+end
+
+% get best fit
+[~,bestrestart] = max(gof_all);
+tp_iter = tp_all(:,:,bestrestart(1));
+ip = ip_all(bestrestart(1),:);
+tp_sim = tp_iter;
+tp_sim(tp_sim<tpmin) = 0;
+simdat = plotKinMdlSim(degen,tp_sim,ip,expPrm,h_fig1);
+simdat.tpmin = tpmin;
+
+% calculate confidence interval for each coefficient (SMACKS)
+if verbose
+    nb = dispProgress(' calculate confidence intervals...',nb);
+end
+[posiv,negiv,nb2] = calcmdlconfiv(tp_iter,expPrm.seq,B0,ip,verbose);
+nb = nb+nb2;
+tp_err = cat(3,posiv,negiv);
+
+% remove ill defined intervals due to too small number operations
+tp_err(isnan(tp_err) | isinf(tp_err) | tp_err<0) = 0; 
+
+% display processing time
+t_toc = toc(t);
+if verbose
+    nb = dispProgress([' total processing time: ',num2str(t_toc)],nb);
+end
+
+

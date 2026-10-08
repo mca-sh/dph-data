@@ -1,0 +1,283 @@
+function [f_prm,dataset_name,f_r,f_mlph,f_bw,datset_id,p] = ...
+    PHtest_initialization(src0,meth,R,d_0,specdat,isspec,dumpname)
+
+% CONSTANTS
+EXPDAT_DIR_NAME = {'EBS-IBS', 'D135'};    % experimental data folder name
+TRAJ_DIR_NAME = 'trajectories'; % fodler name where exp. traj. are stored
+
+MDL_SELECT = 'BIC';              % [ML-PH] 'BIC' or 'cross-validation'
+DISTRIB_TYPE = 1;                % [ML-PH] 1 for DPH, 2 for PH
+T_PH = 100;                      % [ML-PH] 100 nb of model initializations
+K_PH = 5;                        % [ML-PH] 5 nb of data subset for K-fold cross-validation
+M_MAX_PH = 100000;               % [ML-PH] 100000 max nb of E-M cycles (auto: 10^(D+1))
+D_L_MIN_PH = 1E-6;               % [ML-PH] 1E-6 convergence criterion on log-likelihood
+D_PRM_MIN_PH = 1E-8;             % [ML-PH] 1E-8 convergence criterion on parameters
+
+K_INIT = 10;     % [iEMM] initial nb. of components
+GAMMA = 1;       % [iEMM] stick breaking concentration parameter
+N_ITER = 'auto'; % [iEMM] number of Gibbs sampling iterations (auto: set to sample size)
+THIN = 5;        % [iEMM] iteration picking interval
+LAMBDA_A = 0.01; % [iEMM] shape param of Gamma prior on rate constants
+LAMBDA_B = 0.01; % [iEMM] scale param of Gamma prior on rate constants
+
+T_MLNMM = 100;          % [ML-NMM] nb of model initializations
+M_MAX_MLNMM = 'auto';   % [ML-NMM] max nb of E-M cycles (auto: set to sample size)
+D_L_MIN_MLNMM = 1E-6;   % [ML-NMM] convergence criterion on log-likelihood
+D_TAU_MIN_MLNMM = 1E-8; % [ML-NMM] convergence criterion on time constants
+
+% initialize output
+f_prm = {};
+f_dat = {};
+f_r = {};
+f_mlph ={};
+f_bw ={};
+
+% collect default analysis parameters
+p = PHtest_getdefaultparam;
+p.calcmode = meth;
+
+% add method-specific parameters
+analysis_method = PHtest_getmethodfromcalcmode(meth);
+switch analysis_method
+    case 'mlph'
+        switch MDL_SELECT
+            case 'BIC'
+                p.T = T_PH;       % nb of model initializations
+            case 'cross-validation'
+                p.T = ceil(T_PH/K_PH);  % nb of model initializations
+        end
+        p.M_max = M_MAX_PH;       % max nb. of E-M cycles
+        p.dlmin = D_L_MIN_PH;     % convergence criterion on log-likelihood
+        p.dprmmin = D_PRM_MIN_PH; % convergence criterion on parameters
+        p.PHtype = DISTRIB_TYPE;  % type of distribution (PH or DPH)
+        p.model_selection = MDL_SELECT;
+
+    case 'emexp'
+        p.T = T_MLNMM;               % nb of model initializations
+        p.M_max = M_MAX_MLNMM;       % max nb. of E-M cycles
+        p.dlmin = D_L_MIN_MLNMM;     % convergence criterion on log-likelihood
+        p.dtaumin = D_TAU_MIN_MLNMM; % convergence criterion on time constants
+
+    case 'iemm'
+        p.niters = N_ITER; % nb. of Gibbs sampling iterations
+        p.thin = THIN;     % iteration picking interval
+        p.Kinit = K_INIT;  % initial nb. of clusters
+
+        % Hyperparameters
+        hypers.gamma = GAMMA;       % concentration parameter of stick-breaking
+        hypers.lambda_a = LAMBDA_A; % shape of Gamma prior on rate constants
+        hypers.lambda_b = LAMBDA_B; % rate of Gamma prior on rate constants
+        p.hypers = hypers;
+
+    otherwise
+        error(['Inference method must be ''mlph'', ''emexp'' or ',...
+            '''iemm''']);
+end
+
+% create simulation presets files
+if isspec
+    PHtest_createSimPrm(src0,specdat);
+else
+    PHtest_createSimPrm(src0);
+end
+
+% collect all paths to input/output files
+D = size(d_0,1);
+datset_id = [];
+dataset_name = {};
+r_id = [];
+simseq = [];
+for d = 1:D
+    dcnt = d_0(d,1);
+
+    % list dataset folder name
+    dataset_name = cat(1,dataset_name,[dcnt.name,filesep]);
+
+    % create specific dump directory
+    dumpdirname = PHtest_getdumpflddir(dumpname,...
+        [dcnt.folder,filesep,dcnt.name]);
+    if isempty(dumpdirname)
+        dumpdirname = ['01-',dumpname];
+    end
+    srcdir = [dcnt.folder,filesep,dcnt.name];
+    destdir = [dcnt.folder,filesep,dcnt.name,filesep,dumpdirname];
+    if ~exist(destdir,'dir')
+        mkdir(destdir)
+    end
+
+    % determines whether BW analysis must be performed
+    splitpath = split(srcdir,filesep);
+    bwana = contains(splitpath{end},{'dataset500','dataset600','EBS-IBS'});
+
+    % determines whether data are simulated or experimental
+    issim = all(~strcmp(dcnt.name, EXPDAT_DIR_NAME));
+    
+    if issim
+        % list all parameter files
+        prmfle = dir([srcdir,filesep,'*_simprm.mat']);
+
+        for f = 1:size(prmfle,1)
+
+            % build path to simulated data file
+            setname = prmfle(f).name(1:end-length('_simprm.mat'));
+            subdir = [destdir,filesep,setname];
+            if ~exist(subdir,'dir')
+                mkdir(subdir)
+            end
+            
+            % append file and directory paths specific to current data
+            f_dat = cat(1,f_dat,[srcdir,filesep,setname,'.dummy']);
+            for r = 1:R
+                simdatfle = ...
+                    [srcdir,filesep,setname,sprintf('_%i_simres.mat',r)];
+
+                f_prm = cat(1,f_prm,[srcdir,filesep,prmfle(f).name]);
+                f_r = cat(1,f_r,simdatfle);
+                f_mlph = cat(1,f_mlph,[subdir,filesep,setname,...
+                    sprintf('_%i_mldphres.mat',r)]);
+                if ~bwana
+                    bwfle = {''};
+                else
+                    bwfle = [subdir,filesep,setname,...
+                        sprintf('_%i_bwres.mat',r)];
+                end
+                f_bw = cat(1,f_bw,bwfle);
+                datset_id = cat(1,datset_id,d);
+                r_id = cat(1,r_id,r);
+                simseq = cat(1,simseq,bwana);
+            end
+        end
+        
+    else % experimental data
+        exp_id = find(strcmp(dcnt.name, EXPDAT_DIR_NAME), 1);
+        r = 1;
+
+        % build path to data file
+        expdatfle = ...
+            [srcdir, filesep, EXPDAT_DIR_NAME{exp_id}, '_data.mat'];
+
+        % append file and directory paths specific to experimental data
+        f_dat = cat(1, f_dat, ...
+            [srcdir, filesep, EXPDAT_DIR_NAME{exp_id}, '.dummy']);
+
+        f_prm = cat(1, f_prm, {''});
+        f_r = cat(1, f_r, expdatfle);
+        f_mlph = cat(1, f_mlph, [destdir, filesep, EXPDAT_DIR_NAME{exp_id},...
+            sprintf('_%i_mldphres.mat', r)]);
+        f_bw = cat(1, f_bw, [destdir, filesep, EXPDAT_DIR_NAME{exp_id},...
+            sprintf('_%i_bwres.mat', r)]);
+        datset_id = cat(1, datset_id, d);
+        r_id = cat(1, r_id, r);
+        simseq = cat(1, simseq, bwana);
+    end
+end
+
+% Ensure no parallel pool are running
+delete(gcp('nocreate'));
+
+% Create cluster and remove jobs
+myCluster = parcluster('Processes');
+delete(myCluster.Jobs);
+
+% Start parallel pool
+parpool(myCluster);
+
+% reorder files so that each dataset is first analyzed before the other
+% replicates
+[~,n_ord] = sort(r_id);
+f_prm = f_prm(n_ord);
+f_r = f_r(n_ord);
+f_mlph = f_mlph(n_ord);
+f_bw = f_bw(n_ord);
+datset_id = datset_id(n_ord);
+
+% initiate log printing (necessary for very large a large list of files)
+disp('Simulate missing datasets ...');
+[n_exist,n_all,dat_name,max_l,ndigit] = init_print_progress('',...
+    dataset_name,f_r,datset_id);
+
+% print initial state
+nchar = print_progress_parallel(dat_name,n_exist,n_all,max_l,ndigit,0);
+
+% define data queue function for log printing
+q = parallel.pool.DataQueue();
+afterEach(q, @(id) parfor_loop_callback(id));
+    function parfor_loop_callback(id)
+        % Mise à jour réelle du vecteur sur le thread principal
+        n_exist(id) = n_exist(id) + 1;
+        % Mise à jour de l'affichage (nb_char est géré ici)
+        print_progress_parallel(dat_name,n_exist,n_all,max_l,ndigit,nchar);
+    end
+
+% simulate or import data and delete result with obsolete parameters
+N = size(f_r,1);
+obsolete_results = false(1,N);
+parfor n = 1:N
+    [srcdir, ~, ~] = fileparts(f_r{n});
+    splitpath = split(srcdir((length(src0) + 1):end), filesep);
+    datname = splitpath{end};
+    p_n = PHtest_adjustparam(p, datname);
+    if isfield(p_n, 'PHtype')
+        phtype = p_n.PHtype;
+    else
+        phtype = 1;
+    end
+    refresh_print = false;
+    if all(~strcmp(datname, EXPDAT_DIR_NAME)) % simulated data
+        if ~exist(f_r{n},'file')
+            % simulate data and save to file if not existing
+            PHtest_simdata(f_prm{n}, f_r{n}, simseq(n), phtype,...
+                strcmp(PHtest_getmethodfromcalcmode(meth), 'iamm'));
+            refresh_print = true;
+        end
+
+    elseif ~exist(f_r{n},'file') % experimental data
+        % import data and save it to file if not existing
+        PHtest_importexpdata(f_r{n}, [srcdir, filesep, TRAJ_DIR_NAME]);
+        refresh_print = true;
+    end
+
+    % delete existing results file if analysis parameters changed
+    if exist(f_mlph{n}, 'file')
+        if contains('phprm', who('-file', f_mlph{n}))
+            res = load(f_mlph{n}, 'dphres', 'phprm');
+            if strcmp(analysis_method, 'mlph') && ...
+                    ~isfield(res.phprm, 'model_selection')
+                res.phprm.model_selection = 'BIC';
+                dat2save = ...
+                    struct('phprm', res.phprm, 'dphres', res.dphres);
+                save(f_mlph{n},' -mat', '-append', '-fromstruct', ...
+                    dat2save);
+            end
+            if ~isequal(res.phprm, p_n)
+                obsolete_results(n) = true;
+            end
+        else
+            obsolete_results(n) = true;
+        end
+    end
+
+    % show progress
+    if refresh_print
+        send(q, datset_id(n)); % Envoie l'ID au thread principal
+    end
+end
+if ~any(obsolete_results)
+    return
+end
+
+% delete obsolete result files
+del = questdlg({sprintf('%i Analysis files are outdated.',...
+    nnz(obsolete_results)),'Delete them?'},'Delete _mldphres.mat files',...
+    'Delete','Save','Save');
+if strcmp(del,'Delete')
+    for n = find(obsolete_results)
+        delete(f_mlph{n});
+        if exist(f_bw{n},'file')
+            delete(f_bw{n});
+        end
+    end
+end
+end
+
+
